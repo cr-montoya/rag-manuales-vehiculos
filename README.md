@@ -147,6 +147,8 @@ Todos los controles viven **fuera del modelo**: se cumplen aunque el modelo se e
 
 ## Lecciones aprendidas
 
+Las cinco más importantes. La lista completa de los 18 problemas que aparecieron, con síntoma, causa, solución y lección, está en la **[bitácora](docs/bitacora.md)**, incluidos los errores de diagnóstico.
+
 ### 1. El parsing es la decisión más subestimada de un RAG
 
 La primera versión usaba el parser por defecto, que solo extrae texto. En el cuadro de mantenimiento de la Yamaha XTZ125, la fila *Aceite de motor* marca los kilómetros con chulos en columnas. El parser entregaba `Aceite de motor / Cambiar / √√√√√√`: las columnas se perdían y **ningún chunking ni embedding podía recuperarlas**. El asistente respondía, con razón, que no lo encontraba.
@@ -209,6 +211,7 @@ La primera versión exponía la Function URL de la Lambda como pública. Ahora C
 │       └── alertas.py            7. Alarmas, presupuesto y Slack
 └── docs/
     ├── 00-inception.md           Inception (AI-DLC): intención, criterios, supuestos
+    ├── bitacora.md               Los 18 problemas encontrados y cómo se resolvieron
     ├── arquitectura.drawio       Diagrama editable
     ├── arquitectura.png          Diagrama para este README
     ├── flujo-rag.excalidraw      Flujo a mano alzada: deploy, ingesta, pregunta (editable)

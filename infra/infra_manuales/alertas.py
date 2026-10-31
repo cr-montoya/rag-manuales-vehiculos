@@ -23,6 +23,7 @@ Antes hay que autorizar el workspace una vez en la consola (ver README).
 from aws_cdk import (
     Annotations,
     Duration,
+    Stack,
     aws_budgets as budgets,
     aws_chatbot as chatbot,
     aws_cloudwatch as cw,
@@ -136,15 +137,24 @@ class Alertas(Construct):
         alarma("Calidad", "Más del 40 % de respuestas 'no encontrado' en una hora", tasa, 40,
                cw.ComparisonOperator.GREATER_THAN_THRESHOLD)
 
-        # 6. Costo: presupuesto mensual de la cuenta, avisando por el mismo tema SNS.
-        # AWS Budgets necesita permiso para publicar en el tema.
+        # Quién puede publicar en el tema. Lección aprendida: al agregar SOLO el permiso de
+        # Budgets, esta política reemplazó la política por defecto de SNS y CloudWatch quedó
+        # sin permiso ("CloudWatch Alarms is not authorized to perform: SNS:Publish").
+        # Ninguna alarma llegaba a Slack; se descubrió forzando una alarma a mano.
+        # Por eso se declaran los dos servicios, limitados a esta cuenta.
         self.tema.add_to_resource_policy(
             iam.PolicyStatement(
                 actions=["sns:Publish"],
-                principals=[iam.ServicePrincipal("budgets.amazonaws.com")],
+                principals=[
+                    iam.ServicePrincipal("cloudwatch.amazonaws.com"),
+                    iam.ServicePrincipal("budgets.amazonaws.com"),
+                ],
                 resources=[self.tema.topic_arn],
+                conditions={"StringEquals": {"aws:SourceAccount": Stack.of(self).account}},
             )
         )
+
+        # 6. Costo: presupuesto mensual de la cuenta, avisando por el mismo tema SNS.
         aviso = lambda tipo, porcentaje: budgets.CfnBudget.NotificationWithSubscribersProperty(
             notification=budgets.CfnBudget.NotificationProperty(
                 notification_type=tipo,
