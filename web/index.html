@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Manual de mi vehículo</title>
+  <style>
+    :root { --fondo: #f6f7f9; --tarjeta: #fff; --texto: #1d2330; --suave: #5b6476; --acento: #1f6feb; --aviso: #b42318; --borde: #dde1e7; }
+    @media (prefers-color-scheme: dark) {
+      :root { --fondo: #12151b; --tarjeta: #1b2029; --texto: #e7eaf0; --suave: #9aa3b2; --acento: #5a9cff; --aviso: #ff7b72; --borde: #2c3340; }
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; font: 16px/1.5 system-ui, sans-serif; background: var(--fondo); color: var(--texto); }
+    main { max-width: 560px; margin: 0 auto; padding: 16px; }
+    h1 { font-size: 1.4rem; margin: 8px 0 4px; }
+    p.sub { color: var(--suave); margin: 0 0 16px; }
+    .tarjeta { background: var(--tarjeta); border: 1px solid var(--borde); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+    label { display: block; font-weight: 600; margin: 12px 0 6px; }
+    select, textarea, button { width: 100%; font: inherit; border-radius: 8px; border: 1px solid var(--borde); padding: 10px; background: var(--tarjeta); color: var(--texto); }
+    textarea { min-height: 80px; resize: vertical; }
+    button { background: var(--acento); color: #fff; border: none; font-weight: 600; margin-top: 16px; cursor: pointer; }
+    button:disabled { opacity: .6; }
+    .foto { display: flex; gap: 8px; align-items: center; }
+    .foto img { max-height: 64px; border-radius: 6px; }
+    .respuesta { white-space: pre-wrap; }
+    .aviso { color: var(--aviso); font-weight: 600; }
+    .cita { border-left: 3px solid var(--acento); padding: 4px 10px; margin-top: 10px; color: var(--suave); font-size: .9rem; }
+    .chips button { width: auto; margin: 6px 6px 0 0; padding: 6px 10px; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Manual de mi vehículo</h1>
+  <p class="sub">Pregunta lo que dice el manual de tu moto o carro. Te respondo con la página.</p>
+
+  <div class="tarjeta">
+    <label for="vehiculo">Mi vehículo</label>
+    <select id="vehiculo"><option value="">No sé / elegir después</option></select>
+
+    <label for="pregunta">Pregunta</label>
+    <textarea id="pregunta" placeholder="¿Cada cuánto cambio el aceite?"></textarea>
+
+    <label for="archivo">Foto del tablero (opcional)</label>
+    <div class="foto">
+      <input id="archivo" type="file" accept="image/*" capture="environment">
+      <img id="vista" alt="" hidden>
+    </div>
+
+    <button id="enviar">Preguntar</button>
+  </div>
+
+  <div id="salida" class="tarjeta" hidden></div>
+</main>
+
+<script>
+  // La URL de la API y la lista de vehículos llegan en config.json, que escribe CDK al desplegar
+  let config;
+  let imagenB64 = null;
+  const $ = (id) => document.getElementById(id);
+
+  fetch("config.json").then(r => r.json()).then(c => {
+    config = c;
+    for (const v of c.vehiculos) $("vehiculo").add(new Option(v.etiqueta, v.id));
+  });
+
+  // Reduce la foto a 1024 px y la pasa a JPEG: menos datos por el celular y por la Lambda
+  $("archivo").addEventListener("change", (e) => {
+    const archivo = e.target.files[0];
+    if (!archivo) { imagenB64 = null; $("vista").hidden = true; return; }
+    const img = new Image();
+    img.onload = () => {
+      const escala = Math.min(1, 1024 / Math.max(img.width, img.height));
+      const lienzo = document.createElement("canvas");
+      lienzo.width = img.width * escala; lienzo.height = img.height * escala;
+      lienzo.getContext("2d").drawImage(img, 0, 0, lienzo.width, lienzo.height);
+      const datos = lienzo.toDataURL("image/jpeg", 0.8);
+      imagenB64 = datos.split(",")[1];
+      $("vista").src = datos; $("vista").hidden = false;
+    };
+    img.src = URL.createObjectURL(archivo);
+  });
+
+  function mostrar(r) {
+    const salida = $("salida");
+    salida.hidden = false;
+    salida.replaceChildren();
+    const p = document.createElement("div");
+    p.className = "respuesta";
+    p.textContent = r.respuesta || r.error;
+    salida.append(p);
+
+    if (r.descripcion_foto) {
+      const d = document.createElement("div");
+      d.className = "cita"; d.textContent = "En la foto veo: " + r.descripcion_foto;
+      salida.prepend(d);
+    }
+    for (const c of r.citas || []) {
+      const d = document.createElement("div");
+      d.className = "cita"; d.textContent = `Página ${c.pagina}: "${c.extracto}..."`;
+      salida.append(d);
+    }
+    if (r.aviso_taller) p.innerHTML = p.textContent.replace(/(Por seguridad.*)$/s, '<span class="aviso">$1</span>');
+
+    // Si el sistema pregunta por el vehículo, ofrece botones para elegirlo
+    if (r.opciones) {
+      const chips = document.createElement("div"); chips.className = "chips";
+      for (const o of r.opciones) {
+        const b = document.createElement("button"); b.textContent = o.etiqueta;
+        b.onclick = () => { $("vehiculo").value = o.id; preguntar(); };
+        chips.append(b);
+      }
+      salida.append(chips);
+    }
+  }
+
+  async function preguntar() {
+    const boton = $("enviar");
+    boton.disabled = true; boton.textContent = "Buscando en el manual...";
+    try {
+      const cuerpo = JSON.stringify({ vehiculo_id: $("vehiculo").value || null, pregunta: $("pregunta").value, imagen: imagenB64 });
+      // CloudFront firma la petición hacia la Lambda (OAC). Para un POST, Lambda exige
+      // el SHA-256 del cuerpo en este header: el navegador lo calcula aquí.
+      const hash = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(cuerpo));
+      const hex = [...new Uint8Array(hash)].map(b => b.toString(16).padStart(2, "0")).join("");
+      const r = await fetch(config.api, {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-amz-content-sha256": hex },
+        body: cuerpo,
+      });
+      mostrar(await r.json());
+    } catch (e) {
+      mostrar({ error: "No pude conectarme. Intenta de nuevo." });
+    } finally {
+      boton.disabled = false; boton.textContent = "Preguntar";
+    }
+  }
+  $("enviar").addEventListener("click", preguntar);
+</script>
+</body>
+</html>

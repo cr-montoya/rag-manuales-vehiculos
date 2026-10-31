@@ -1,0 +1,68 @@
+[
+  {
+    "id": "honda-wave110i-2015",
+    "etiqueta": "Moto Honda Wave 110i (2015)",
+    "tipo": "moto",
+    "marca": "honda",
+    "modelo": "wave 110i",
+    "anio": "2015",
+    "archivo": "honda-wave110i-2015.pdf",
+    "url": "https://motos.honda.es/wp-content/uploads/manuales/2015AFS110CSF.pdf",
+    "fuente": "Sitio oficial de Honda Motos España (código de modelo AFS110)"
+  },
+  {
+    "id": "nissan-frontier-2023",
+    "etiqueta": "Camioneta Nissan Frontier (2023)",
+    "tipo": "carro",
+    "marca": "nissan",
+    "modelo": "frontier",
+    "anio": "2023",
+    "archivo": "nissan-frontier-2023.pdf",
+    "url": "https://www.nissan.com.mx/content/dam/Nissan/mexico/assets/frontier/my23/vlp/manual/manual-nissan-frontier-2023.pdf",
+    "fuente": "Sitio oficial de Nissan México"
+  },
+  {
+    "id": "yamaha-xtz125",
+    "etiqueta": "Moto Yamaha XTZ125",
+    "tipo": "moto",
+    "marca": "yamaha",
+    "modelo": "xtz125",
+    "anio": "s/d",
+    "archivo": "yamaha-xtz125.pdf",
+    "url": "https://www.incolmotos-yamaha.com.co/wp-content/uploads/2018/03/XTZ125.pdf",
+    "fuente": "Sitio oficial de Incolmotos Yamaha (Colombia)"
+  },
+  {
+    "id": "yamaha-xtz250",
+    "etiqueta": "Moto Yamaha XTZ250",
+    "tipo": "moto",
+    "marca": "yamaha",
+    "modelo": "xtz250",
+    "anio": "s/d",
+    "archivo": "yamaha-xtz250.pdf",
+    "url": "https://www.incolmotos-yamaha.com.co/wp-content/uploads/2018/03/XTZ250.pdf",
+    "fuente": "Sitio oficial de Incolmotos Yamaha (Colombia)"
+  },
+  {
+    "id": "bajaj-pulsar-ns125",
+    "etiqueta": "Moto Bajaj Pulsar NS125 (manual en inglés)",
+    "tipo": "moto",
+    "marca": "bajaj",
+    "modelo": "pulsar ns125",
+    "anio": "2026",
+    "archivo": "bajaj-pulsar-ns125.pdf",
+    "url": "https://cdn.bajajauto.com/-/media/assets/bajajauto/customer-service/owners-manual/owners-manual-pdf/owner-manual-pdf-2026/pulsar-ns125_led-bt.pdf",
+    "fuente": "Sitio oficial de Bajaj Auto (India). En Colombia la distribuye Auteco"
+  },
+  {
+    "id": "byd-seagull",
+    "etiqueta": "Carro eléctrico BYD Seagull (manual en inglés)",
+    "tipo": "carro",
+    "marca": "byd",
+    "modelo": "seagull",
+    "anio": "s/d",
+    "archivo": "byd-seagull.pdf",
+    "url": "https://www.byd.com/material/byd-site/mea-public/after-sales/manual/maroc/byd-seagull/BYD%20SEAGULL%20Owner%E2%80%99s%20Manual%20EN.pdf",
+    "fuente": "Sitio oficial de BYD (edición Marruecos). En Colombia se vende como Dolphin Mini [verificar equivalencia]"
+  }
+]

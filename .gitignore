@@ -1,0 +1,56 @@
+# .gitignore de la demo de manuales.
+# Criterio: este repo se muestra en pantalla y se publica en GitHub.
+# Nada que tenga derechos de terceros, secretos o datos de la cuenta de AWS.
+
+# --- 1. Contenido de terceros --------------------------------------------------
+# Manuales con derechos de autor: se descargan con scripts/descargar_manuales.py
+corpus/pdf/
+*.pdf
+
+# --- 2. Secretos y credenciales ------------------------------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+.aws/
+credentials
+*secret*
+*token*.json
+
+# --- 3. Datos de la cuenta de AWS ----------------------------------------------
+# cdk.context.json guarda el ID de la cuenta y búsquedas de AZ/VPC: se regenera solo
+infra/cdk.context.json
+# Salida de CDK: plantillas con ARNs y el ID de la cuenta
+infra/cdk.out/
+cdk.out/
+# Salidas de deploy y evidencia cruda (URLs, ARNs, logs con IDs)
+outputs.json
+pruebas/salida/
+*.log
+
+# --- 4. Python y uv ------------------------------------------------------------
+# uv.lock SÍ se versiona: fija las versiones exactas
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# --- 5. Node (npx cdk) ---------------------------------------------------------
+node_modules/
+
+# --- 6. Editor y sistema operativo ---------------------------------------------
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- 7. Fotos de prueba del tablero --------------------------------------------
+# Pueden traer metadatos (GPS, modelo del celular). Las de la demo van limpias en evidencia/
+pruebas/fotos/
