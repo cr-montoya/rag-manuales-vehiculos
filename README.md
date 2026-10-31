@@ -304,8 +304,8 @@ uv run --project infra python pruebas/evaluar.py
 | Carga en casa (manual en inglés) | ✅ | Responde en español: 220 a 250 V |
 | Luz roja de presión de aceite | ✅ | Detenerse y apagar, con aviso de taller |
 | Trampas: vehículo equivocado, fuera del manual, inyección | ✅ | No responde con otro manual, dice que no está, bloquea |
-| Cada cuánto cambio el aceite | ❌ | "Cada 3000 km": omite el primer cambio a los 500 km (completitud) |
-| Aceite de la Pulsar (manual en inglés) | ❌ | La página con la especificación no está en el índice |
+| Cada cuánto cambio el aceite | ❌ | "Cada 3000 km": omite el primer cambio a los 500 km. Ajustar las instrucciones no bastó; el siguiente paso es un generador más capaz |
+| Aceite de la Pulsar (manual en inglés) | ❌ | La página con la especificación no está en el índice. Ahora falla de forma segura: dice que no lo encontró |
 
 Los dos fallos están analizados en la [bitácora](docs/bitacora.md) (problemas 19 a 22).
 

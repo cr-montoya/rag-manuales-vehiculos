@@ -25,9 +25,9 @@ Todo lo que salió mal construyendo esta app, en el orden en que pasó: qué se 
 | 17 | **Diagnóstico equivocado:** un dato "inventado" que sí estaba | Proceso | Corregido |
 | 18 | **Ninguna alarma llegaba a Slack** | Observabilidad | Resuelto: política de SNS |
 | 19 | El set dorado no pasa: 8 de 10 | Evaluación | Abierto |
-| 20 | Respuesta respaldada pero incompleta | RAG: generación | Abierto |
+| 20 | Respuesta respaldada pero incompleta | RAG: generación | Abierto: la instrucción no bastó |
 | 21 | **Páginas del manual que nunca llegaron al índice** | RAG: ingesta | Abierto: causa por confirmar |
-| 22 | Un "no encontré" dicho con otras palabras pasaba como respuesta | Producto | Abierto |
+| 22 | Un "no encontré" dicho con otras palabras pasaba como respuesta | Producto | Resuelto: sin citas = no encontrado |
 
 ---
 
@@ -165,7 +165,7 @@ Todo lo que salió mal construyendo esta app, en el orden en que pasó: qué se 
 ## 19. El set dorado no pasa: 8 de 10
 
 - **Qué se hizo:** 10 preguntas con la respuesta verificada a mano contra el PDF, cubriendo los 6 manuales, los dos idiomas, un caso de seguridad y tres trampas. Ver [`pruebas/`](../pruebas/).
-- **Resultado:** 8 de 10. Las tres trampas pasan: vehículo equivocado, fuera del manual e inyección. El umbral pide 9 de 10.
+- **Resultado:** 8 de 10 en las dos corridas. Las tres trampas pasan: vehículo equivocado, fuera del manual e inyección. El umbral pide 9 de 10. Entre corridas cambió la calidad del fallo: el caso de la Pulsar pasó de entregar un "no encontré" disfrazado de respuesta a decir con claridad que no está.
 - **Fallos:** los problemas 20 y 21. El 22 apareció al revisar el detalle de las respuestas.
 - **Lección:** el set dorado encontró en 30 segundos dos fallos que las pruebas a mano no habían visto. Por eso es la compuerta antes de cualquier cambio.
 
@@ -173,8 +173,9 @@ Todo lo que salió mal construyendo esta app, en el orden en que pasó: qué se 
 
 - **Síntoma:** a "¿cada cuánto cambio el aceite?" (Yamaha XTZ125) responde "cada 3000 km". El cuadro de mantenimiento marca el primer cambio a los **500 km** y luego cada 3000.
 - **Causa:** el grounding pasa (el dato está en la fuente), pero nada obliga a la respuesta a incluir **todos** los valores relevantes del fragmento.
-- **Solución propuesta:** pedir en las instrucciones del generador que incluya el primer intervalo y la frecuencia cuando el fragmento traiga una tabla de intervalos, y volver a correr el set dorado.
-- **Lección:** el grounding no mide completitud; los datos esperados del set dorado, sí.
+- **Intento 1:** se agregó a las instrucciones del generador que incluya todos los valores relevantes de una fila de tabla (primer intervalo y frecuencia). **No funcionó:** el set dorado volvió a fallar. Nova 2 Lite respondió que la fila marca "Cambiar" en la columna de los 3000 km, cuando la fila tiene marcas en las seis columnas. El modelo lee mal la tabla; no es un problema de instrucciones.
+- **Siguiente opción:** escalar el generador a un modelo más capaz (Nova Pro), que es exactamente la regla definida en el Inception: escalar solo si el set dorado lo muestra. Ahora lo muestra.
+- **Lección:** el grounding no mide completitud; los datos esperados del set dorado, sí. Y no todo se arregla con prompt: cuando el set dorado falla después de ajustar instrucciones, la evidencia justifica cambiar de modelo.
 
 ## 21. Páginas del manual que nunca llegaron al índice
 
@@ -191,7 +192,8 @@ Todo lo que salió mal construyendo esta app, en el orden en que pasó: qué se 
 
 - **Síntoma:** en el caso de la Pulsar, el modelo respondió *"No encontré información específica sobre qué tipo de aceite usar…"*, sin citas, y la app lo entregó como respuesta normal.
 - **Causa:** el código detecta el "no encontrado" buscando la frase exacta de las instrucciones. El modelo la dijo con otras palabras.
-- **Solución propuesta:** tratar como "no encontrado" toda respuesta que no cite ninguna página. Es una regla en código y no depende de la redacción del modelo.
+- **Solución:** toda respuesta que no cite ninguna página se trata como "no encontrado". Es una regla en código y no depende de la redacción del modelo.
+- **Verificación:** en la segunda corrida del set dorado, el mismo caso responde *"No encontré eso en el manual de tu vehículo."*. Sigue sin el dato (problema 21), pero ahora falla de forma segura.
 - **Lección:** no confiar en que el modelo repita una frase exacta. Las reglas deben verificar una señal estructural (hay o no hay citas).
 
 ---

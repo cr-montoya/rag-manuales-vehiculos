@@ -57,6 +57,9 @@ INSTRUCCIONES = """Eres un asistente que responde preguntas sobre el manual del 
 Reglas:
 - Responde SOLO con la información de los fragmentos del manual que te doy. No uses conocimiento propio.
 - Después de cada dato, cita la página así: (pág. N).
+- Si el dato viene de una tabla de intervalos o de valores (kilómetros, presiones, capacidades),
+  incluye todos los valores relevantes de la fila: por ejemplo, el primer intervalo y la
+  frecuencia de los siguientes, o el valor para cada caso (delantera y trasera, una o dos personas).
 - Si los fragmentos no contienen la respuesta, responde exactamente: "{no_encontrado}"
 - Máximo 4 frases, en español, claras para alguien que no sabe de mecánica.
   Si el manual está en inglés, traduce la respuesta al español y conserva la cita de página.
@@ -279,7 +282,11 @@ def handler(event, context):
 
     # Si el modelo dice que no lo encontró, se responde SOLO eso: nada de relleno
     # ("visita el sitio web") que no venga del manual. Regla en código, no en el prompt.
-    encontrado = NO_ENCONTRADO not in texto
+    # Lección aprendida: el modelo a veces dice "no encontré" con otras palabras.
+    # Por eso la señal es estructural: una respuesta sin ninguna cita de página
+    # no tiene fuente, y se trata como "no encontrado".
+    sin_citas = not re.search(r"p[áa]g\.\s*\d+", texto)
+    encontrado = NO_ENCONTRADO not in texto and not sin_citas
     if not encontrado:
         texto = NO_ENCONTRADO
 
