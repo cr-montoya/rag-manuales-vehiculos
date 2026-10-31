@@ -24,9 +24,10 @@ Preguntas "¿cada cuánto cambio el aceite?" o subes una foto del tablero ("¿qu
 5. [Lecciones aprendidas](#lecciones-aprendidas)
 6. [Estructura del repositorio](#estructura-del-repositorio)
 7. [Desplegar](#desplegar)
-8. [Costos](#costos)
-9. [Destruir](#destruir)
-10. [Manuales y derechos de autor](#manuales-y-derechos-de-autor)
+8. [Pruebas](#pruebas)
+9. [Costos](#costos)
+10. [Destruir](#destruir)
+11. [Manuales y derechos de autor](#manuales-y-derechos-de-autor)
 
 ---
 
@@ -147,7 +148,7 @@ Todos los controles viven **fuera del modelo**: se cumplen aunque el modelo se e
 
 ## Lecciones aprendidas
 
-Las cinco más importantes. La lista completa de los 18 problemas que aparecieron, con síntoma, causa, solución y lección, está en la **[bitácora](docs/bitacora.md)**, incluidos los errores de diagnóstico.
+Las cinco más importantes. La lista completa de los problemas que aparecieron, con síntoma, causa, solución y lección, está en la **[bitácora](docs/bitacora.md)**, incluidos los errores de diagnóstico.
 
 ### 1. El parsing es la decisión más subestimada de un RAG
 
@@ -195,6 +196,10 @@ La primera versión exponía la Function URL de la Lambda como pública. Ahora C
 ├── backend/handler.py            Lambda: los 5 pasos de cada pregunta, comentados
 ├── web/index.html                SPA para el celular (vehículo, pregunta, foto)
 ├── corpus/manuales.json          Catálogo: vehículo, metadatos y URL oficial del PDF
+├── pruebas/
+│   ├── set_dorado.json           10 preguntas con la respuesta verificada en el PDF
+│   ├── evaluar.py                Corre el set dorado contra la Lambda
+│   └── resultados.md             Último reporte
 ├── scripts/
 │   ├── descargar_manuales.py     Descarga los PDF y escribe sus metadatos
 │   └── ingestar.py               Lanza la ingesta y espera a que termine
@@ -211,7 +216,7 @@ La primera versión exponía la Function URL de la Lambda como pública. Ahora C
 │       └── alertas.py            7. Alarmas, presupuesto y Slack
 └── docs/
     ├── 00-inception.md           Inception (AI-DLC): intención, criterios, supuestos
-    ├── bitacora.md               Los 18 problemas encontrados y cómo se resolvieron
+    ├── bitacora.md               Los problemas encontrados y cómo se resolvieron
     ├── arquitectura.drawio       Diagrama editable
     ├── arquitectura.png          Diagrama para este README
     ├── flujo-rag.excalidraw      Flujo a mano alzada: deploy, ingesta, pregunta (editable)
@@ -278,6 +283,37 @@ Para encenderla, el mismo comando sin `web_activa=false`. Cada cambio tarda unos
 aws cloudwatch describe-alarms --region us-east-1 --query "MetricAlarms[].AlarmName"
 aws cloudwatch set-alarm-state --region us-east-1 --alarm-name NOMBRE --state-value ALARM --state-reason "Prueba de Slack"
 ```
+
+---
+
+## Pruebas
+
+### Set dorado
+
+Diez preguntas con la respuesta **verificada a mano contra el PDF**, incluidas tres trampas. Cada caso revisa el tipo de respuesta, los **datos esperados** (completitud), la página citada y el aviso de taller. Umbral: 9 de 10, con las trampas obligatorias.
+
+```bash
+uv run --project infra python pruebas/evaluar.py
+```
+
+**Último resultado: 8 de 10, trampas 3 de 3. No pasa el umbral.** Reporte completo en [`pruebas/resultados.md`](pruebas/resultados.md); casos en [`pruebas/set_dorado.json`](pruebas/set_dorado.json).
+
+| Caso | Resultado | Por qué |
+| --- | --- | --- |
+| Cantidad de aceite, presión de llantas, capacidad del tanque | ✅ | Dato correcto con su página |
+| Carga en casa (manual en inglés) | ✅ | Responde en español: 220 a 250 V |
+| Luz roja de presión de aceite | ✅ | Detenerse y apagar, con aviso de taller |
+| Trampas: vehículo equivocado, fuera del manual, inyección | ✅ | No responde con otro manual, dice que no está, bloquea |
+| Cada cuánto cambio el aceite | ❌ | "Cada 3000 km": omite el primer cambio a los 500 km (completitud) |
+| Aceite de la Pulsar (manual en inglés) | ❌ | La página con la especificación no está en el índice |
+
+Los dos fallos están analizados en la [bitácora](docs/bitacora.md) (problemas 19 a 22).
+
+### Alertas
+
+Alarma forzada a mano, entregada en Slack por Amazon Q Developer:
+
+![Alarma de CloudWatch en Slack](docs/evidencia/slack-alarma.png)
 
 ---
 

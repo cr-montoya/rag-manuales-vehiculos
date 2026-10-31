@@ -24,6 +24,10 @@ Todo lo que salió mal construyendo esta app, en el orden en que pasó: qué se 
 | 16 | Una versión de guardrail que no se actualiza sola | IaC | Resuelto |
 | 17 | **Diagnóstico equivocado:** un dato "inventado" que sí estaba | Proceso | Corregido |
 | 18 | **Ninguna alarma llegaba a Slack** | Observabilidad | Resuelto: política de SNS |
+| 19 | El set dorado no pasa: 8 de 10 | Evaluación | Abierto |
+| 20 | Respuesta respaldada pero incompleta | RAG: generación | Abierto |
+| 21 | **Páginas del manual que nunca llegaron al índice** | RAG: ingesta | Abierto: causa por confirmar |
+| 22 | Un "no encontré" dicho con otras palabras pasaba como respuesta | Producto | Abierto |
 
 ---
 
@@ -157,3 +161,39 @@ Todo lo que salió mal construyendo esta app, en el orden en que pasó: qué se 
 - **Solución:** la política del tema declara explícitamente a CloudWatch y a Budgets, limitados a la cuenta (`aws:SourceAccount`).
 - **Verificación:** con el arreglo desplegado, la misma alarma forzada registra *"Successfully executed action"* hacia el tema de SNS, donde antes decía *"Failed to execute action"*, y el mensaje llega al canal de Slack.
 - **Lección:** una alerta que nunca se ha probado no es una alerta. Hay que forzar la falla.
+
+## 19. El set dorado no pasa: 8 de 10
+
+- **Qué se hizo:** 10 preguntas con la respuesta verificada a mano contra el PDF, cubriendo los 6 manuales, los dos idiomas, un caso de seguridad y tres trampas. Ver [`pruebas/`](../pruebas/).
+- **Resultado:** 8 de 10. Las tres trampas pasan: vehículo equivocado, fuera del manual e inyección. El umbral pide 9 de 10.
+- **Fallos:** los problemas 20 y 21. El 22 apareció al revisar el detalle de las respuestas.
+- **Lección:** el set dorado encontró en 30 segundos dos fallos que las pruebas a mano no habían visto. Por eso es la compuerta antes de cualquier cambio.
+
+## 20. Respuesta respaldada pero incompleta
+
+- **Síntoma:** a "¿cada cuánto cambio el aceite?" (Yamaha XTZ125) responde "cada 3000 km". El cuadro de mantenimiento marca el primer cambio a los **500 km** y luego cada 3000.
+- **Causa:** el grounding pasa (el dato está en la fuente), pero nada obliga a la respuesta a incluir **todos** los valores relevantes del fragmento.
+- **Solución propuesta:** pedir en las instrucciones del generador que incluya el primer intervalo y la frecuencia cuando el fragmento traiga una tabla de intervalos, y volver a correr el set dorado.
+- **Lección:** el grounding no mide completitud; los datos esperados del set dorado, sí.
+
+## 21. Páginas del manual que nunca llegaron al índice
+
+- **Síntoma:** a "¿qué aceite le pongo y cada cuánto lo cambio?" (Bajaj Pulsar NS125) no encuentra el dato. La página con la especificación (SAE 20W50, cambio cada 10.000 km) existe en el PDF.
+- **Qué se midió:**
+  - La misma pregunta **en inglés** tampoco trae esa página, así que el idioma no es la causa.
+  - Pidiendo hasta 100 fragmentos de ese manual, aparecen 58 fragmentos que empiezan en 50 páginas distintas. **10 páginas no tienen ningún fragmento**, entre ellas la de la especificación del aceite.
+  - Además, la búsqueda devuelve menos fragmentos que los pedidos (3 o 4 de 8) `[verificar causa]`.
+- **Causas posibles, por confirmar:** que el parser con visión haya devuelto vacío en páginas con mucha imagen, o que el texto de esas páginas haya quedado dentro de un fragmento que empieza en la página anterior.
+- **Pendiente:** revisar la salida del parser por página y, si se confirma, subir el número de fragmentos recuperados y validar en la ingesta que cada página produzca texto.
+- **Lección:** que una ingesta diga "6 de 6 documentos indexados" no significa que **todas las páginas** estén en el índice. Hay que medir cobertura por página.
+
+## 22. Un "no encontré" dicho con otras palabras pasaba como respuesta
+
+- **Síntoma:** en el caso de la Pulsar, el modelo respondió *"No encontré información específica sobre qué tipo de aceite usar…"*, sin citas, y la app lo entregó como respuesta normal.
+- **Causa:** el código detecta el "no encontrado" buscando la frase exacta de las instrucciones. El modelo la dijo con otras palabras.
+- **Solución propuesta:** tratar como "no encontrado" toda respuesta que no cite ninguna página. Es una regla en código y no depende de la redacción del modelo.
+- **Lección:** no confiar en que el modelo repita una frase exacta. Las reglas deben verificar una señal estructural (hay o no hay citas).
+
+---
+
+**Nota sobre los números de página `[verificar]`:** cada fragmento se etiqueta con la página donde **empieza**. Si empieza al final de una página, la cita puede quedar una página antes de donde está el dato (en un caso, la cita dijo 50 y el dato está en la 51 del visor de PDF). Por eso el set dorado acepta una página de diferencia.
