@@ -161,13 +161,20 @@ Se detectó **contrastando la cita con el PDF fuente**. Solución: un prompt sin
 
 **Consecuencia para las pruebas:** el set dorado valida la **página citada**, no solo que la respuesta suene bien.
 
-### 3. Una cita real no garantiza un dato real
+### 3. Grounding no es lo mismo que completitud
 
-Con el parser corregido, el asistente respondió: *"El aceite debe cambiarse cada 3000 km (pág. 44)"*. La página 44 existe y habla del aceite, pero el fragmento solo tenía la fila `Aceite de motor · Cambiar · √ √ √ √ √ √`, **sin los kilómetros**: el cuadro de mantenimiento ocupa varias páginas y el encabezado con los kilómetros solo está en la primera. El parser lee página por página, así que no puede unirlos. El "3000 km" lo infirió el modelo.
+Con el parser corregido se agregó un **grounding contextual** en el guardrail: cada respuesta se compara con los fragmentos y, si afirma algo que no está, no se entrega. Los puntajes reales:
 
-**Control:** grounding contextual en el guardrail. Cada respuesta se compara con los fragmentos; si afirma algo que no está, no se entrega y la persona ve las páginas para revisarlas.
+| Pregunta | Grounding | Resultado |
+| --- | --- | --- |
+| Luz roja de presión de aceite (Nissan Frontier) | 0,99 | Se entrega |
+| Cantidad de aceite (Yamaha XTZ125) | 0,87 | Se entrega: 1.00 L, pág. 50 |
+| Cada cuánto cambio el aceite (Yamaha XTZ125) | 0,92 | Se entrega: "cada 3000 km (pág. 44)" |
+| Trampa: pregunta de moto con la camioneta elegida | **0,49** | **Bloqueada**: se muestran las páginas para revisar |
 
-**Mejora pendiente (causa raíz):** llevar el encabezado de las tablas que ocupan varias páginas a cada fragmento, con una transformación propia en la ingesta.
+El caso del aceite muestra el límite del control: el cuadro de mantenimiento marca cambio a los **500**, 3000, 6000, 9000, 12000 y 15000 km. "Cada 3000 km" **está respaldado**, pero **omite el primer cambio a los 500 km**. El grounding mide que lo dicho esté en la fuente, no que esté completo.
+
+**Consecuencia:** el set dorado valida los datos esperados de cada respuesta (por ejemplo, "500 km" y "3000 km"), no solo que haya una cita.
 
 ### 4. Un aviso que sale siempre deja de servir
 

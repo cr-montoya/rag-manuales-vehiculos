@@ -41,10 +41,10 @@ class Guardrail(Construct):
                 ]
             ),
             # Grounding contextual: compara la respuesta con los fragmentos del manual.
-            # Lección aprendida: el modelo respondió "cada 3000 km (pág. 44)" cuando el
-            # fragmento solo tenía chulos sin kilómetros. La cita era real; el dato no.
             # - GROUNDING: ¿cada afirmación está respaldada por los fragmentos?
             # - RELEVANCE: ¿la respuesta contesta la pregunta?
+            # Mide sustento, no completitud: "cada 3000 km" pasa (0,92) aunque omita
+            # el primer cambio a los 500 km. La completitud la valida el set dorado.
             # Umbrales iniciales; se ajustan con el set dorado (más alto = más estricto).
             contextual_grounding_policy_config=bedrock.CfnGuardrail.ContextualGroundingPolicyConfigProperty(
                 filters_config=[
