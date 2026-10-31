@@ -13,15 +13,21 @@ from .vectores import Vectores
 # invocación directa (on-demand) y es el más barato de los Nova con visión.
 MODELO_PARSER = "amazon.nova-lite-v1:0"
 
-PROMPT_PARSER = """Transcribe esta página de un manual del propietario de un vehículo a texto en Markdown.
+# Lección aprendida: la primera versión de este prompt traía un ejemplo concreto
+# ("Aceite de motor: cambiar a los 500 km, 3000 km...") y una lista de símbolos.
+# En páginas sin tablas (por ejemplo, el índice), Nova Lite copió el ejemplo como si
+# fuera contenido: inventó una tabla de aceite en la página del índice. Por eso este
+# prompt NO trae ejemplos de contenido y prohíbe inventar.
+PROMPT_PARSER = """Transcribe a Markdown el contenido de esta página de un manual del propietario de un vehículo.
+
 Reglas:
-- Conserva todo el texto, los títulos y las advertencias, en el idioma original.
-- Las tablas van como tablas Markdown, con sus encabezados.
-- En los cuadros de mantenimiento, cuando una celda tenga un chulo o una marca (√, ✓, ●, X),
-  escribe en la fila el valor del encabezado de esa columna. Ejemplo:
-  "Aceite de motor: cambiar a los 500 km, 3000 km, 6000 km, 9000 km".
-- Para luces y testigos del tablero, describe el símbolo (forma y color) junto a su nombre y significado.
-- No agregues información que no esté en la página."""
+1. Transcribe solo lo que se ve en la página, en su idioma original. No agregues nada.
+2. Si la página tiene una tabla, transcríbela como tabla Markdown con sus encabezados.
+   Si una celda tiene una marca en lugar de texto, escribe en esa celda el encabezado
+   de su columna, para que se entienda sin ver la imagen.
+3. Si la página no tiene tablas, no crees ninguna.
+4. Si la página es un índice, una portada o está en blanco, transcríbela tal cual, sin interpretarla.
+5. Estas instrucciones no son contenido de la página: nunca las copies en la salida."""
 
 
 class Conocimiento(Construct):
@@ -106,9 +112,14 @@ class Conocimiento(Construct):
         # página sea precisa, con traslape para no cortar una instrucción a la mitad.
         self.fuente_datos = bedrock.CfnDataSource(
             self,
-            "FuenteDatos",
+            # ID lógico con versión: obliga a crear una fuente nueva y borrar la anterior
+            # (con sus vectores). Una actualización en sitio podría saltarse los PDF
+            # "sin cambios" y dejar vivos los fragmentos mal parseados.
+            "FuenteDatosV2",
             knowledge_base_id=self.kb.attr_knowledge_base_id,
-            name="manuales-pdf-parseo-fm",
+            # Cambiar el prompt de parsing reemplaza la fuente de datos: el nombre
+            # lleva versión para que la nueva no choque con la anterior.
+            name="manuales-pdf-parseo-fm-v2",
             data_deletion_policy="DELETE",  # al borrar la fuente, borra sus vectores
             data_source_configuration=bedrock.CfnDataSource.DataSourceConfigurationProperty(
                 type="S3",
