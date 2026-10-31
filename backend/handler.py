@@ -8,8 +8,10 @@ Una petición pasa por cinco pasos, siempre en este orden:
      se suma a la búsqueda. La foto no reemplaza al manual; solo arma la consulta.
   4. Búsqueda filtrada: la Knowledge Base busca SOLO en los fragmentos cuyo
      metadato marca/modelo/año coincide con el vehículo elegido.
-  5. Respuesta: Nova redacta con los fragmentos y cita la página. Si el tema es
-     de seguridad, el código (no el modelo) agrega "llévalo al taller".
+  5. Respuesta: Nova redacta con los fragmentos y cita la página.
+  6. Verificación: el guardrail compara la respuesta con los fragmentos
+     (grounding contextual). Si afirma algo que no está, no se entrega.
+     Si la pregunta es de seguridad, el código (no el modelo) agrega "llévalo al taller".
 
 Cada paso deja un log JSON en CloudWatch: es la evidencia de la demo.
 """
@@ -33,13 +35,21 @@ bedrock = boto3.client("bedrock-runtime")
 kb = boto3.client("bedrock-agent-runtime")
 
 NO_ENCONTRADO = "No encontré eso en el manual de tu vehículo."
+NO_VERIFICADO = (
+    "Encontré información relacionada en el manual, pero no pude verificar una respuesta "
+    "exacta. Revisa las páginas citadas abajo o consulta a un técnico."
+)
 AVISO_TALLER = "Por seguridad, llévalo al taller para que lo revise un técnico."
 
-# Política de seguridad determinista: si la pregunta, la foto o la respuesta tocan
-# estos temas, se agrega el aviso. Vive en código porque no debe depender del modelo.
+# Política de seguridad determinista: el aviso sale cuando la PREGUNTA o la FOTO
+# describen un síntoma o un sistema crítico. Vive en código porque no debe depender
+# del modelo. Lección aprendida: con la palabra "aceite" sola, el aviso salía hasta
+# en "¿cuánto aceite lleva?"; un aviso que sale siempre deja de servir.
 TEMAS_SEGURIDAD = re.compile(
-    r"fren|temperatura|sobrecalent|recalent|aceite|refrigerante|bolsa de aire|airbag|"
-    r"direcci[oó]n asistida|testigo rojo|luz roja|humo|fuga",
+    r"fren|temperatura|sobrecalent|recalent|refrigerante|bolsa de aire|airbag|direcci[oó]n|"
+    r"humo|fuga|goteo|olor a quemado|ruido|vibra|"
+    r"(luz|testigo|indicador)\w*\s+(rojo|roja|encendid|parpade|de (aceite|presi[oó]n|motor|bater[ií]a|freno))|"
+    r"presi[oó]n de(l)? aceite|se (apag|recalient|calient)",
     re.IGNORECASE,
 )
 
@@ -156,26 +166,54 @@ def buscar(consulta: str, vehiculo: dict) -> list[dict]:
 
 
 # --- Paso 5: redactar la respuesta con citas ---------------------------------------
-def redactar(pregunta: str, descripcion_foto: str | None, vehiculo: dict, fragmentos: list[dict]) -> tuple[str, dict]:
+def redactar(pregunta: str, descripcion_foto: str | None, vehiculo: dict, fragmentos: list[dict]) -> tuple[str, dict, str]:
     contexto = "\n\n".join(f"[Fragmento, pág. {f['pagina']}]\n{f['texto']}" for f in fragmentos)
     texto_usuario = f"Vehículo: {vehiculo['etiqueta']}\n"
     if descripcion_foto:
         texto_usuario += f"En la foto del tablero se ve: {descripcion_foto}\n"
     texto_usuario += f"Pregunta: {pregunta}\n\nFragmentos del manual:\n{contexto}"
 
+    # Sin guardrailConfig aquí: la salida se revisa en el paso 6, con los
+    # fragmentos como fuente, para que el guardrail pueda medir el grounding.
     r = bedrock.converse(
         modelId=MODELO_ID,
         system=[{"text": INSTRUCCIONES}],
         messages=[{"role": "user", "content": [{"text": texto_usuario}]}],
         inferenceConfig={"maxTokens": 400, "temperature": 0},
-        # El guardrail también revisa la salida del modelo
-        guardrailConfig={
-            "guardrailIdentifier": GUARDRAIL_ID,
-            "guardrailVersion": GUARDRAIL_VERSION,
-        },
     )
     texto = r["output"]["message"]["content"][0]["text"].strip()
-    return texto, r.get("usage", {})
+    return texto, r.get("usage", {}), contexto
+
+
+# --- Paso 6: verificar la respuesta contra los fragmentos --------------------------
+def verificar_salida(pregunta: str, contexto: str, respuesta: str) -> tuple[str, dict]:
+    """Devuelve (veredicto, puntajes). Veredicto: "ok", "sin_sustento" o "bloqueado".
+
+    El guardrail recibe tres piezas, cada una marcada con su papel:
+    - grounding_source: los fragmentos del manual (la verdad contra la que se compara);
+    - query: la pregunta (para medir si la respuesta es relevante);
+    - la respuesta del modelo (lo que se evalúa).
+    """
+    r = bedrock.apply_guardrail(
+        guardrailIdentifier=GUARDRAIL_ID,
+        guardrailVersion=GUARDRAIL_VERSION,
+        source="OUTPUT",
+        content=[
+            {"text": {"text": contexto[:100_000], "qualifiers": ["grounding_source"]}},
+            {"text": {"text": pregunta[:1_000], "qualifiers": ["query"]}},
+            {"text": {"text": respuesta}},
+        ],
+    )
+    puntajes, veredicto = {}, "ok"
+    for evaluacion in r.get("assessments", []):
+        for f in evaluacion.get("contextualGroundingPolicy", {}).get("filters", []):
+            puntajes[f["type"]] = round(f.get("score", 0), 2)
+            if f.get("action") == "BLOCKED":
+                veredicto = "sin_sustento"
+        for f in evaluacion.get("contentPolicy", {}).get("filters", []):
+            if f.get("action") == "BLOCKED":
+                return "bloqueado", puntajes
+    return veredicto, puntajes
 
 
 def handler(event, context):
@@ -233,22 +271,44 @@ def handler(event, context):
     fragmentos = buscar(consulta, vehiculo)
 
     # Paso 5: respuesta (sin fragmentos no se llama al modelo: no hay nada que citar)
+    contexto, uso = "", {}
     if fragmentos:
-        texto, uso = redactar(pregunta_limpia, descripcion_foto, vehiculo, fragmentos)
+        texto, uso, contexto = redactar(pregunta_limpia, descripcion_foto, vehiculo, fragmentos)
     else:
-        texto, uso = NO_ENCONTRADO, {}
+        texto = NO_ENCONTRADO
 
     # Si el modelo dice que no lo encontró, se responde SOLO eso: nada de relleno
     # ("visita el sitio web") que no venga del manual. Regla en código, no en el prompt.
     encontrado = NO_ENCONTRADO not in texto
     if not encontrado:
         texto = NO_ENCONTRADO
-    seguridad = encontrado and bool(TEMAS_SEGURIDAD.search(" ".join(x for x in [pregunta, descripcion_foto, texto] if x)))
+
+    # Paso 6: verificación de grounding. Una respuesta con cita real pero con un dato
+    # que no está en los fragmentos no se entrega: se muestran las páginas para revisar.
+    veredicto, puntajes = ("sin_revisar", {})
+    if encontrado:
+        veredicto, puntajes = verificar_salida(pregunta_limpia, contexto, texto)
+        if veredicto == "bloqueado":
+            log("guardrail_bloqueo_salida", vehiculo_id=vehiculo_id, puntajes=puntajes)
+            return respuesta_http(
+                {"tipo": "bloqueado", "respuesta": "No puedo responder eso. Pregúntame sobre el manual de tu vehículo."}
+            )
+        if veredicto == "sin_sustento":
+            log("grounding_insuficiente", vehiculo_id=vehiculo_id, puntajes=puntajes, respuesta_descartada=texto)
+            texto, encontrado = NO_VERIFICADO, False
+
+    # El aviso depende de lo que PREGUNTA la persona (o muestra la foto), no de la
+    # respuesta del modelo: así sale aunque no haya respuesta y no sale de más.
+    seguridad = bool(TEMAS_SEGURIDAD.search(" ".join(x for x in [pregunta, descripcion_foto] if x)))
     if seguridad:
         texto = f"{texto}\n\n{AVISO_TALLER}"
 
-    # Citas: solo las páginas que el modelo realmente citó en el texto
-    paginas_citadas = {int(p) for p in re.findall(r"p[áa]g\.\s*(\d+)", texto)}
+    # Citas: las páginas que el modelo citó. Si la respuesta no se pudo verificar,
+    # se muestran las páginas más relevantes para que la persona las revise.
+    if veredicto == "sin_sustento":
+        paginas_citadas = {f["pagina"] for f in fragmentos[:3]}
+    else:
+        paginas_citadas = {int(p) for p in re.findall(r"p[áa]g\.\s*(\d+)", texto)}
     citas = [
         {"pagina": f["pagina"], "extracto": f["texto"][:300]}
         for f in fragmentos
@@ -265,14 +325,17 @@ def handler(event, context):
         fragmentos=[{"pagina": f["pagina"], "vehiculo": f["vehiculo"], "puntaje": f["puntaje"]} for f in fragmentos],
         paginas_citadas=sorted(paginas_citadas),
         encontrado=encontrado,
+        grounding=veredicto,
+        grounding_puntajes=puntajes,
         aviso_taller=seguridad,
         tokens=uso,
         latencia_ms=int((time.time() - inicio) * 1000),
     )
 
+    tipo = "respuesta" if encontrado else ("no_verificado" if veredicto == "sin_sustento" else "no_encontrado")
     return respuesta_http(
         {
-            "tipo": "respuesta" if encontrado else "no_encontrado",
+            "tipo": tipo,
             "vehiculo": vehiculo["etiqueta"],
             "respuesta": texto,
             "citas": citas,

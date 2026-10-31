@@ -70,7 +70,8 @@ Hay tres momentos distintos. Los PDF se leen **una sola vez**, en la ingesta; ca
 | 5 | Si hay foto, Nova describe el testigo del tablero; esa descripción se suma a la búsqueda | Amazon Nova 2 Lite |
 | 6 | La Knowledge Base busca **solo en el manual del vehículo elegido** (filtro por marca, modelo y año) | Bedrock Knowledge Bases |
 | 7 | Titan vectoriza la pregunta y S3 Vectors devuelve los 8 fragmentos más parecidos | Titan Embeddings V2, S3 Vectors |
-| 8 | Nova redacta la respuesta con la página citada. Si es tema de seguridad, el código agrega "llévalo al taller" | Amazon Nova 2 Lite |
+| 8 | Nova redacta la respuesta con la página citada | Amazon Nova 2 Lite |
+| 9 | El guardrail compara la respuesta con los fragmentos (grounding contextual). Si afirma algo que no está, no se entrega y se muestran las páginas para revisar. Si la pregunta describe un síntoma de seguridad, el código agrega "llévalo al taller" | Bedrock Guardrails |
 
 El código de estos pasos está en [`backend/handler.py`](backend/handler.py), comentado paso por paso.
 
@@ -133,9 +134,10 @@ Todos los controles viven **fuera del modelo**: se cumplen aunque el modelo se e
 | Filtro por vehículo antes de buscar | `handler.py`, `buscar()` | Responder con el manual de otro vehículo |
 | Sin vehículo identificado, se pregunta | `handler.py`, paso 1 | Adivinar el vehículo |
 | Guardrail en entrada y salida, con versión fija | `guardrail.py` | Prompt injection, insultos, datos personales en claro |
+| Grounding contextual sobre cada respuesta | `guardrail.py`, `handler.py` paso 6 | Respuestas con una cita real pero con un dato que no está en el fragmento |
 | Sin fragmentos, no se llama al modelo | `handler.py`, paso 5 | Respuestas sin fuente |
 | "No encontré" se responde solo, sin relleno | `handler.py` | Que el modelo complete con conocimiento propio |
-| Regla de seguridad en código | `handler.py`, `TEMAS_SEGURIDAD` | Que "llévalo al taller" dependa del modelo |
+| Regla de seguridad en código, por síntomas (luces rojas, frenos, temperatura, fugas, ruidos) | `handler.py`, `TEMAS_SEGURIDAD` | Que "llévalo al taller" dependa del modelo, o que salga en cualquier pregunta y deje de servir |
 | IAM de mínimo privilegio por carril | Cada archivo de `infra_manuales/` | Que una pieza pueda hacer más de lo que necesita |
 | Buckets privados, SSE-S3, solo HTTPS | `fuente.py`, `web.py` | Acceso directo a los datos |
 | Lambda solo invocable por CloudFront (OAC, `AWS_IAM`) | `web.py` | Saltarse el borde |
@@ -159,7 +161,19 @@ Se detectó **contrastando la cita con el PDF fuente**. Solución: un prompt sin
 
 **Consecuencia para las pruebas:** el set dorado valida la **página citada**, no solo que la respuesta suene bien.
 
-### 3. El backend no debe ser alcanzable sin pasar por el borde
+### 3. Una cita real no garantiza un dato real
+
+Con el parser corregido, el asistente respondió: *"El aceite debe cambiarse cada 3000 km (pág. 44)"*. La página 44 existe y habla del aceite, pero el fragmento solo tenía la fila `Aceite de motor · Cambiar · √ √ √ √ √ √`, **sin los kilómetros**: el cuadro de mantenimiento ocupa varias páginas y el encabezado con los kilómetros solo está en la primera. El parser lee página por página, así que no puede unirlos. El "3000 km" lo infirió el modelo.
+
+**Control:** grounding contextual en el guardrail. Cada respuesta se compara con los fragmentos; si afirma algo que no está, no se entrega y la persona ve las páginas para revisarlas.
+
+**Mejora pendiente (causa raíz):** llevar el encabezado de las tablas que ocupan varias páginas a cada fragmento, con una transformación propia en la ingesta.
+
+### 4. Un aviso que sale siempre deja de servir
+
+La regla de "llévalo al taller" saltaba con la palabra *aceite*, incluso en "¿cuánta cantidad lleva?". Ahora se activa por **síntomas** en la pregunta o en la foto (luces rojas, frenos, temperatura, fugas, ruidos), no por la respuesta del modelo.
+
+### 5. El backend no debe ser alcanzable sin pasar por el borde
 
 La primera versión exponía la Function URL de la Lambda como pública. Ahora CloudFront es la única puerta: la Lambda exige firma (`AWS_IAM`) y solo CloudFront firma (OAC). Para los `POST`, el navegador envía el SHA-256 del cuerpo en el header `x-amz-content-sha256`, como exige Lambda.
 
