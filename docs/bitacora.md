@@ -155,4 +155,5 @@ Todo lo que salió mal construyendo esta app, en el orden en que pasó: qué se 
 - **Causa:** para que AWS Budgets publicara en el tema de SNS se agregó un permiso a la política del tema. Esa política **reemplaza** la política por defecto de SNS, que es la que dejaba publicar a CloudWatch. Quedó solo el permiso de Budgets.
 - **Cómo se detectó:** forzando una alarma a mano (`set-alarm-state`) y leyendo el historial de acciones, en vez de asumir que funcionaba.
 - **Solución:** la política del tema declara explícitamente a CloudWatch y a Budgets, limitados a la cuenta (`aws:SourceAccount`).
+- **Verificación:** con el arreglo desplegado, la misma alarma forzada registra *"Successfully executed action"* hacia el tema de SNS, donde antes decía *"Failed to execute action"*.
 - **Lección:** una alerta que nunca se ha probado no es una alerta. Hay que forzar la falla.
