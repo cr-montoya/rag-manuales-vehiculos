@@ -238,6 +238,16 @@ La ingesta corre en AWS: el script solo consulta el estado y se puede cerrar.
 
 **5. Abrir la web.** La URL sale al final del deploy como `UrlWeb`.
 
+### Apagar la web sin destruir nada
+
+La distribución de CloudFront solo atiende peticiones desde Colombia. Para dejarla deshabilitada (por ejemplo, de noche), sin borrar la Knowledge Base ni lo ingerido:
+
+```bash
+npx cdk deploy --context region=us-east-1 --context web_activa=false
+```
+
+Para encenderla, el mismo comando sin `web_activa=false`. Cada cambio tarda unos minutos mientras CloudFront se propaga.
+
 ### Probar que las alertas llegan a Slack
 
 ```bash

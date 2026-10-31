@@ -52,9 +52,17 @@ class Web(Construct):
         # Quien firma es CloudFront (OAC), no el navegador.
         url_funcion = asistente.funcion.add_function_url(auth_type=lambda_.FunctionUrlAuthType.AWS_IAM)
 
+        # Interruptor: con --context web_activa=false la distribución queda deshabilitada
+        # (no responde a nadie) sin borrar nada. Útil para apagar la demo de noche.
+        activa = self.node.try_get_context("web_activa") != "false"
+
         distribucion = cloudfront.Distribution(
             self,
             "Distribucion",
+            enabled=activa,
+            # Solo se atienden peticiones desde Colombia: corta casi todo el tráfico
+            # automatizado de afuera, sin costo adicional.
+            geo_restriction=cloudfront.GeoRestriction.allowlist("CO"),
             default_root_object="index.html",
             # Ruta por defecto: la SPA desde S3
             default_behavior=cloudfront.BehaviorOptions(
