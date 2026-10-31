@@ -39,7 +39,12 @@ CATALOGO = json.loads((RAIZ / "corpus" / "manuales.json").read_text(encoding="ut
 # Modelos. Se cambian aquí y en ningún otro lugar.
 MODELO_EMBEDDINGS = "amazon.titan-embed-text-v2:0"  # convierte texto en vectores de 1024 números
 DIMENSIONES = 1024
-MODELO_GENERADOR = "amazon.nova-2-lite-v1:0"  # lee texto e imágenes, barato y rápido
+# Generador: Nova 2 Lite (lee texto e imágenes, barato y rápido).
+# Se probó escalar a Nova Pro porque Lite omitía un intervalo de una tabla. El set dorado
+# mostró que Pro no lo arreglaba y además atribuyó el lubricante de la CADENA (SAE 90,
+# cada 500 km) al aceite del MOTOR, donde Lite decía con honestidad "no encontré".
+# Más caro y menos seguro: se volvió a Lite. Ver docs/bitacora.md, problema 23.
+MODELO_GENERADOR = "amazon.nova-2-lite-v1:0"
 PERFIL_INFERENCIA = f"us.{MODELO_GENERADOR}"  # reparte la carga entre regiones de EE. UU.
 
 

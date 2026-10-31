@@ -118,7 +118,7 @@ Criterios, en orden de peso: (1) no responder con el manual equivocado, (2) resp
 | RAG | Bedrock Knowledge Bases | Pipeline propio (LangChain) | Menos código y operación; el pipeline queda como configuración |
 | Vector store | **S3 Vectors** | OpenSearch Serverless | OpenSearch Serverless cobra un mínimo mensual aunque no se use `[verificar]`; S3 Vectors cobra por uso |
 | Parser | **Nova Lite (modelo con visión)** | Parser por defecto (solo texto) | El parser por defecto pierde las columnas de las tablas de mantenimiento. Costo: tokens por página, solo al ingerir |
-| Generador | **Nova 2 Lite** | Claude | Lee imágenes, es barato y lo cubren los créditos de AWS. Se escala a Nova Pro solo si las pruebas muestran que lee mal las fotos |
+| Generador | **Nova 2 Lite** | Claude; Nova Pro | Lee imágenes, es barato y lo cubren los créditos de AWS. Se probó Nova Pro con el set dorado: no mejoró y atribuyó un dato de la cadena al aceite del motor, así que se revirtió |
 | Filtro por vehículo | Metadatos en cada fragmento, filtro antes de buscar | Un índice por vehículo | Un solo índice escala; el filtro garantiza que nunca entra otro manual |
 | Entrada | **CloudFront delante de todo** | Function URL pública | Un solo dominio, sin CORS, la Lambda no es alcanzable sin pasar por el borde, y ahí se pone WAF |
 | Alertas | Slack con Amazon Q Developer | Webhook + Lambda + Parameter Store | Igual de gratis, sin código ni secreto que cuidar |
@@ -304,10 +304,10 @@ uv run --project infra python pruebas/evaluar.py
 | Carga en casa (manual en inglés) | ✅ | Responde en español: 220 a 250 V |
 | Luz roja de presión de aceite | ✅ | Detenerse y apagar, con aviso de taller |
 | Trampas: vehículo equivocado, fuera del manual, inyección | ✅ | No responde con otro manual, dice que no está, bloquea |
-| Cada cuánto cambio el aceite | ❌ | "Cada 3000 km": omite el primer cambio a los 500 km. Ajustar las instrucciones no bastó; el siguiente paso es un generador más capaz |
+| Cada cuánto cambio el aceite | ❌ | "Cada 3000 km": omite el primer cambio a los 500 km. Ni ajustar las instrucciones ni cambiar a Nova Pro lo arregló |
 | Aceite de la Pulsar (manual en inglés) | ❌ | La página con la especificación no está en el índice. Ahora falla de forma segura: dice que no lo encontró |
 
-Los dos fallos están analizados en la [bitácora](docs/bitacora.md) (problemas 19 a 22).
+Los dos fallos están analizados en la [bitácora](docs/bitacora.md) (problemas 19 a 23).
 
 ### Alertas
 

@@ -28,6 +28,7 @@ Todo lo que salió mal construyendo esta app, en el orden en que pasó: qué se 
 | 20 | Respuesta respaldada pero incompleta | RAG: generación | Abierto: la instrucción no bastó |
 | 21 | **Páginas del manual que nunca llegaron al índice** | RAG: ingesta | Abierto: causa por confirmar |
 | 22 | Un "no encontré" dicho con otras palabras pasaba como respuesta | Producto | Resuelto: sin citas = no encontrado |
+| 23 | **Un modelo más capaz respondió peor** | Modelo | Revertido a Nova 2 Lite |
 
 ---
 
@@ -174,7 +175,7 @@ Todo lo que salió mal construyendo esta app, en el orden en que pasó: qué se 
 - **Síntoma:** a "¿cada cuánto cambio el aceite?" (Yamaha XTZ125) responde "cada 3000 km". El cuadro de mantenimiento marca el primer cambio a los **500 km** y luego cada 3000.
 - **Causa:** el grounding pasa (el dato está en la fuente), pero nada obliga a la respuesta a incluir **todos** los valores relevantes del fragmento.
 - **Intento 1:** se agregó a las instrucciones del generador que incluya todos los valores relevantes de una fila de tabla (primer intervalo y frecuencia). **No funcionó:** el set dorado volvió a fallar. Nova 2 Lite respondió que la fila marca "Cambiar" en la columna de los 3000 km, cuando la fila tiene marcas en las seis columnas. El modelo lee mal la tabla; no es un problema de instrucciones.
-- **Siguiente opción:** escalar el generador a un modelo más capaz (Nova Pro), que es exactamente la regla definida en el Inception: escalar solo si el set dorado lo muestra. Ahora lo muestra.
+- **Intento 2:** escalar el generador a Nova Pro, como dice la regla del Inception (escalar solo si el set dorado lo muestra). **Tampoco funcionó** y empeoró otro caso (ver el problema 23).
 - **Lección:** el grounding no mide completitud; los datos esperados del set dorado, sí. Y no todo se arregla con prompt: cuando el set dorado falla después de ajustar instrucciones, la evidencia justifica cambiar de modelo.
 
 ## 21. Páginas del manual que nunca llegaron al índice
@@ -195,6 +196,19 @@ Todo lo que salió mal construyendo esta app, en el orden en que pasó: qué se 
 - **Solución:** toda respuesta que no cite ninguna página se trata como "no encontrado". Es una regla en código y no depende de la redacción del modelo.
 - **Verificación:** en la segunda corrida del set dorado, el mismo caso responde *"No encontré eso en el manual de tu vehículo."*. Sigue sin el dato (problema 21), pero ahora falla de forma segura.
 - **Lección:** no confiar en que el modelo repita una frase exacta. Las reglas deben verificar una señal estructural (hay o no hay citas).
+
+---
+
+## 23. Un modelo más capaz respondió peor
+
+- **Hipótesis:** si Nova 2 Lite lee mal la tabla de intervalos (problema 20), un modelo más capaz la leería bien.
+- **Experimento:** el generador se cambió a Nova Pro (una línea en `stack.py`), se desplegó y se corrió el set dorado.
+- **Resultado:** 8 de 10, como antes, pero con un fallo **peor**:
+  - El intervalo del aceite siguió incompleto ("cada 3000 km").
+  - En la Pulsar, donde Lite respondía con honestidad "no encontré", Pro afirmó: *"Usa SAE 90 y cámbialo cada 500 km (pág. 46)"*. En el manual, el SAE 90 y los 500 km son **del cuidado de la cadena** (limpiarla con diésel y SAE 90, lubricarla con spray cada 500 km), no del aceite del motor.
+- **Por qué el grounding no lo atrapó:** los dos datos sí están en la fuente; solo están atribuidos a otra pieza. El grounding verifica que el dato exista en la fuente, **no que esté atribuido a lo correcto**.
+- **Decisión:** volver a Nova 2 Lite. Pro cuesta varias veces más por token `[verificar]`, no arregló la completitud y convirtió un fallo seguro en uno peligroso. Se confirmó con otra corrida: vuelve a 8 de 10, con la Pulsar respondiendo "no encontré".
+- **Lección:** un modelo más grande no es automáticamente más seguro. Cambiar de modelo es un cambio que pasa por la compuerta de evaluación, y la evaluación debe poder **revertirlo**. Un "no sé" honesto vale más que una respuesta segura y equivocada.
 
 ---
 
